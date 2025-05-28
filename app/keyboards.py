@@ -1,0 +1,23 @@
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton
+
+main_kb = InlineKeyboardBuilder()
+
+main_kb.row(
+    InlineKeyboardButton(
+        text='🎁 Выбрать подарки',
+        callback_data='select_gift'
+    )
+)
+main_kb.row(
+    InlineKeyboardButton(
+        text='💰 Кошелёк',
+        callback_data='help'
+    )
+)
+main_kb.row(
+    InlineKeyboardButton(
+        text='🛒 Корзина',
+        callback_data='card'
+    )
+)

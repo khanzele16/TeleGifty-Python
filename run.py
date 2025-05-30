@@ -1,22 +1,16 @@
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher
-
+from bot import bot, dp
 from app.handlers import router
 
-from config import TOKEN
-
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+from config import COMMANDS
 
 async def main():
     dp.include_router(router)
+    await bot.set_my_commands(COMMANDS)
     await dp.start_polling(bot)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print('Exit')
+    asyncio.run(main())

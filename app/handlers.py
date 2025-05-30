@@ -1,24 +1,89 @@
-import sqlite3
+import json
 
 from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+
+from app.db import register_user, get_history, get_cart
 
 from app.keyboards import main_kb
 
 router = Router()
 
+# Команда start - запуск бота
 @router.message(CommandStart())
-async def start(message: Message):
-    conn = sqlite3.connect('telegift.sql')
-    cur = conn.cursor()
-    cur.execute('CREATE TABLE IF NOT EXISTS users (id int primary key, username varchar(50), name varchar(50))')
-    conn.commit()
-    cur.execute(f'INSERT INTO users (id, username, name) VALUES ({message.from_user.id}, "{message.from_user.username}", "{message.from_user.first_name}")')
-    cur.close()
-    conn.close()
-    await message.answer(f'✨ Приветствую, {message.from_user.first_name}!\n\nЯ — искатель идеальных подарков, бот, который превращает заботы о подарках в магию.\n\n<b>Выбирай, покупай и радуй</b> — всё в одном месте! 🎁', parse_mode='HTML', reply_markup=main_kb.as_markup())
+async def command_start(message: Message):
+    register_user(message)
+    await message.answer(f'✨ Приветствую, {message.from_user.first_name}!\n\nЯ — искатель идеальных подарков, бот, который превращает заботы о подарках в магию.\n\n<b>Выбирай, покупай и радуй</b> — всё в одном месте! 🎁\n\n<blockquote>Если что-то непонятно, введите команду /help</blockquote>', parse_mode='HTML', reply_markup=main_kb.as_markup())
 
+# Команда gifts - каталог подарков
+@router.message(Command('gifts'))
+async def command_gifts(message: Message):
+    gifts = json.dumps(get_available_gifts())
+
+# Команда cart - корзина 
+@router.message(Command('cart'))
+async def command_cart(message: Message):
+    user_id = message.from_user.id
+    cart = get_cart(user_id)
+    if not cart:
+        await message.answer(
+            "<b>🛒 Ваша корзина пуста.</b>\n\nДобавьте подарки, чтобы они здесь появились.\n\n<blockquote><b>TeleGifty</b> — ваш друг в мире подарков Telegram</blockquote>",
+            parse_mode='HTML'
+        )
+        return
+    text = "<b>🛒 Ваша корзина:</b>\n\n"
+    for i, gift_ids in enumerate(cart, 1):
+        gift_list = ", ".join(gift_ids) if isinstance(gift_ids, list) else str(gift_ids)
+        text += f"{i}. 🎁 Подарки: <code>{gift_list}</code>\n"
+
+    await message.answer(text, parse_mode='HTML')
+
+# Команда gift - выбор подарка (выполняется только если есть id подарка)
+@router.message(Command('gift'))
+async def command_gift(message: Message):
+    text = message.text
+    full_text = text or ""
+    parts = full_text.split(maxsplit=1)
+    gift_id = parts[1] if len(parts) > 1 else None
+    if not gift_id:
+        await message.answer('<b>❓ Извините, я вас не понял!</b>\n\nВы не указали id подарка, к примеру:\n\n<code>/gift 1e3149dfg11d3r4t5</code>\n\n<blockquote><b>TeleGifty</b> — ваш друг в мире подарков Telegram</blockquote>', parse_mode='HTML')
+    await message.answer(gift_id)
+
+# Команда history - история покупок подарков
+@router.message(Command('history'))
+async def command_history(message: Message):
+    history = get_history(message)
+    if not history:
+        await message.answer(
+            "<b>История покупок</b>\n\n🕵️ У вас пока нет истории покупок.\n\n"
+            "<blockquote><b>TeleGifty</b> — ваш друг в мире подарков Telegram</blockquote>",
+            parse_mode="HTML"
+        )
+        return
+    text = "📜 Ваша история покупок:\n\n"
+    for i, (gift_id_str, sum_) in enumerate(history, 1):
+        try:
+            gift_ids = eval(gift_id_str) if isinstance(gift_id_str, str) else gift_id_str
+            if not isinstance(gift_ids, list):
+                gift_ids = [gift_ids]
+        except Exception:
+            gift_ids = [gift_id_str]
+        ids_formatted = ", ".join(f"<code>{gid}</code>" for gid in gift_ids)
+        text += f"{i}. 🎁 ID подарков: {ids_formatted} — {sum_} звёзд\n"
+    await message.answer(text, parse_mode="HTML")
+
+# Команда help - помощь
+@router.message(Command('help'))
+async def command_help(message: Message):
+    await message.answer(f'<b>💭 Помощь </b>\n\nВ этом боте вы можете выбрать подарки, взять их в корзину и купить их в одном месте. Как один подарок, так и несколько подарков.\n\nПодарки покупаются с помощью <b>Telegram Stars.</b> Всё просто, даешь звезды — получаешь подарок.\n\n<i>Комиссия на подарки — 2%</i>\n\n<b>Команды и возможности</b>\n\n<code>/gift :id</code> — выбрать подарок\n<code>/gifts</code> — открыть каталог подарки\n<code>/history</code> — история покупок подарков\n<code>/cart</code> — корзина подаков\n<code>/help</code> — помощь\n\n<b>Связь с разработчиками бота</b>\n\n<i>Поддержка</i> — @khanzele и @frezanXpro\n\n<blockquote><b>TeleGifty</b> — ваш друг в мире подарков Telegram</blockquote>', parse_mode='HTML')
+
+# Обработка всех остальных callback
+@router.callback_query(lambda call: True)
+async def callback(call: CallbackQuery):
+    await call.message.answer('Сейчас здесь нет ничего, к сожалению...')
+
+# Обработка всех остальных сообщений
 @router.message(F)
-async def photo(message: Message):
-    await message.answer(f'<b>Извините!</b>\n\nЯ не понял что вы от меня хотите.\n\n<blockquote>Если хотите смоделировать правильный запрос, вы можете посмотреть команды в /help</blockquote>', parse_mode='HTML')
+async def default_message(message: Message):
+    await message.answer(f'<b>❓ Извините, я вас не понял!</b>\n\nЕсли хотите смоделировать правильный запрос, вы можете посмотреть команды в <b>/help</b>\n\n<blockquote><b>TeleGifty — ваш друг в мире подарков Telegram</b></blockquote>', parse_mode='HTML')

@@ -8,14 +8,7 @@ main_kb.row(
         text='🎁 Выбрать подарки',
         callback_data='select_gift'
     )
-)
-main_kb.row(
-    InlineKeyboardButton(
-        text='💰 Кошелёк',
-        callback_data='help'
-    )
-)
-main_kb.row(
+).row(
     InlineKeyboardButton(
         text='🛒 Корзина',
         callback_data='card'

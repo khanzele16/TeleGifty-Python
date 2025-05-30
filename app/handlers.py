@@ -1,10 +1,8 @@
-import json
-
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 
-from app.db import register_user, get_history, get_cart
+from app.db import register_user, get_history, get_cart, get_available_gifts
 
 from app.keyboards import main_kb
 
@@ -16,10 +14,14 @@ async def command_start(message: Message):
     register_user(message)
     await message.answer(f'✨ Приветствую, {message.from_user.first_name}!\n\nЯ — искатель идеальных подарков, бот, который превращает заботы о подарках в магию.\n\n<b>Выбирай, покупай и радуй</b> — всё в одном месте! 🎁\n\n<blockquote>Если что-то непонятно, введите команду /help</blockquote>', parse_mode='HTML', reply_markup=main_kb.as_markup())
 
-# Команда gifts - каталог подарков
+# Команда giftы - каталог подарков
 @router.message(Command('gifts'))
 async def command_gifts(message: Message):
-    gifts = json.dumps(get_available_gifts())
+    gifts = get_available_gifts()
+    text = "<b>🎁 Каталог подарков:</b>\n\n"
+    for i, gift in enumerate(gifts, 1):
+        text += f"{i}. <b>{gift['name']}</b> — {gift['price']} звёзд\nID: <code>{gift['id']}</code>\n\n"
+    await message.answer(text, parse_mode='HTML')
 
 # Команда cart - корзина 
 @router.message(Command('cart'))
@@ -36,7 +38,6 @@ async def command_cart(message: Message):
     for i, gift_ids in enumerate(cart, 1):
         gift_list = ", ".join(gift_ids) if isinstance(gift_ids, list) else str(gift_ids)
         text += f"{i}. 🎁 Подарки: <code>{gift_list}</code>\n"
-
     await message.answer(text, parse_mode='HTML')
 
 # Команда gift - выбор подарка (выполняется только если есть id подарка)
